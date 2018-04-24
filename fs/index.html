@@ -1,0 +1,721 @@
+<html>
+	<head>
+		<title>IRRead Home Page</title>
+		<script type="text/javascript" src="zepto.min.js"></script>
+		<style>
+		@charset "utf-8";
+		/* CSS Document */
+
+		h1 {
+			font-size: 1.5em;
+		}
+		h2 {
+			font-size: 1.2em;
+		}
+		body {
+			font-family: Arial, Helvetica, sans-serif;
+			color: #aaaaaa;
+			background-color: #111111;
+		}
+		.wave-container {
+			width: 80%;
+			padding: 10px;
+			overflow-x: auto;
+		}
+		.wave-main {
+			border: 1px solid #888888;
+		}
+		.wave-detail {
+			border: 1px solid #888888;
+			max-height: 60%;
+			overflow-x: auto;
+			overflow-y: auto;
+		}
+		.wave-div {
+			width:1800px;
+		}
+		.wave-high {
+			display: inline-block;
+			height: 20px;
+			border-top: 1px solid green;
+			border-right: 1px solid green;
+		}
+		.wave-low {
+			display: inline-block;
+			height: 20px;
+			border-bottom: 1px solid green;
+			border-right: 1px solid green;
+		}
+		.wave-end {
+			display: inline-block;
+			height: 20px;
+			border-bottom: 1px solid green;
+		}
+		input {
+			background-color: #aaaaaa;
+			border: 0;
+			margin: 0px 4px 0px 4px;
+			border-radius: 4px;
+			padding: 1px 4px;
+		}
+		select {
+			background-color: #aaaaaa;
+			border: 0;
+			margin: 0px 4px 0px 4px;
+			border-radius: 4px;
+			padding: 1px 4px;
+		}
+		#code {
+			background-color: #444444;
+			border: 1px solid #666666;
+			padding: 4px 4px;
+		}
+		/* width */
+		::-webkit-scrollbar {
+		    height: 8px;
+		}
+
+		/* Track */
+		::-webkit-scrollbar-track {
+		    background: #444444;
+		}
+
+		/* Handle */
+		::-webkit-scrollbar-thumb {
+		    background: #888888;
+		}
+		button {
+			//height: 20vh;
+			width: 100px;
+			margin: 6px;
+			padding-top: 2px;
+			padding-bottom: 2px;
+			background-color: #cccccc;
+			border-radius: 0.3em;
+			cursor: pointer;
+			font-size: 1.0em;
+			font-weight: bold;
+		}
+
+		</style>
+		<script>
+		var EQUALS = "~";
+		var SEMI_COLON = "-";
+		var COMMA = "_";
+
+		function send() {
+			var scheme = getScheme();
+			var data = document.getElementById('data').value;
+			//alert("Send:" + s);
+
+			$.ajax({
+				type: 'GET',
+				url: '/cgi/Send?s=' + scheme + '&d=' + data,
+				data: {},
+				dataType: 'text',
+				success: function(data) {
+					alert(data);
+				},
+				error: function(xhr, type){
+				  alert('Error(IR Send): '+type)
+				}
+			});
+		}
+
+		function getScheme() {
+			var scheme = ""
+				+ "C" + EQUALS + document.getElementById('scheme').value
+				+ COMMA + document.getElementById('bits').value
+				+ SEMI_COLON + "H" + EQUALS + document.getElementById('headM').value
+				+ COMMA + document.getElementById('headS').value
+				+ SEMI_COLON + "T" + EQUALS + document.getElementById('data1').value
+				+ COMMA + document.getElementById('data2').value
+				+ COMMA + document.getElementById('data3').value
+				+ COMMA + document.getElementById('data4').value
+				+ COMMA + document.getElementById('data5').value
+				+ SEMI_COLON + "P" + EQUALS + document.getElementById('pauseS').value
+				+ SEMI_COLON + "S" + EQUALS + document.getElementById('stopM').value
+				+ COMMA + document.getElementById('stopS').value
+				+ SEMI_COLON + "E" + EQUALS + document.getElementById('endM').value
+				+ SEMI_COLON + "G" + EQUALS + document.getElementById('gap').value
+				+ SEMI_COLON + "R" + EQUALS + document.getElementById('repeat').value
+				+ COMMA + document.getElementById('repCount').value
+				;
+			var repType = document.getElementById('repeat');
+			if (repType == 'M') {
+				scheme += COMMA + document.getElementById('repMask').value;
+			}
+			return scheme;
+		}
+
+		function learn() {
+			$('#msg').text("Start learn...");
+			$.ajax({
+				type: 'GET',
+				url: '/cgi/Learn',
+				data: {},
+				dataType: 'json',
+				success: function(data) {
+					//alert(data.length);
+					$('#msg').text("Waiting...");
+					read();
+				},
+				error: function(xhr, type){
+					alert('Error(IR Learn): '+type)
+				}
+			});
+		}
+		//var scale = 50;
+		var preWave = 50;
+		var postWave = 100;
+		var postSpace = 50;
+		function read() {
+			$.ajax({
+				type: 'GET',
+				url: '/cgi/Read',
+				data: {},
+				dataType: 'json',
+				success: function(data) {
+					//alert(data.length);
+					if (data.length == 0) {
+						$('#msg').text("Waiting...");
+						setTimeout(function() {
+					        read();
+					    }, 2000);
+					}
+					else {
+						$('#msg').text("Complete!");
+						procIRData(data);
+					}
+				},
+				error: function(xhr, type){
+					alert('Error(IR Learn): '+type)
+				}
+			});
+		}
+
+		function procIRData(data) {
+			drawWaveform(0, data, 500, -1);
+			$('#wave-detail').empty();
+			var inx = 0;
+			for (var i = 1; i <= 20; i++) {
+				inx = drawWaveform(i, data, 30, inx);
+				if (inx >= data.length) {
+					break;
+				}
+			}
+			//alert(data);
+			var irs = decode(data);
+			$('#scheme').val(irs.coding);
+			$('#data').val(irs.data ? ('0x' + irs.data.toString(16)) : "???");
+			$('#bits').val(irs.dataBits);
+			$('#headM').val(irs.headM);
+			$('#headS').val(irs.headS);
+			$('#data1').val(irs.timings[0]);
+			$('#data2').val(irs.timings[1]);
+			$('#data3').val(irs.timings[2]);
+			$('#data4').val(irs.timings[3]);
+			$('#data5').val(irs.timings[4]);
+			$('#pauseS').val(irs.pauseS);
+			$('#stopM').val(irs.stopM);
+			$('#stopS').val(irs.stopS);
+			$('#endM').val(irs.endM);
+			$('#gap').val(irs.gap);
+			$('#repeat').val(irs.repeat);
+			$('#repCount').val(irs.repCount);
+			$('#repMask').val(irs.repMask);
+
+			$('#code').text(getScheme());
+		}
+	
+		function drawWaveform(divInx, data, scale, inx) {
+			var div = '#wave-div-' + divInx;
+			$(div).empty();
+			if (inx >= data.length) {
+				return inx;
+			}
+			if (divInx > 0) {
+				$('#wave-detail').append('<div class="wave-div" id="wave-div-' 
+						+ divInx + '"></div><br/>');
+			}
+			var sum = preWave * scale;
+			$(div).append(
+					'<div class="wave-low" style="width:'
+					+ preWave + 'px">&nbsp;</div>');
+			var i = inx;
+			if (inx == -1) {
+				i = 0;
+			}
+			for (; i < data.length; i++) {
+				if (data[i] > 0) {
+					$(div).append(
+							'<div class="wave-high" style="width:'
+							+ Math.round(data[i] / scale)
+							+ 'px" title="' + data[i] + '">&nbsp;</div>');
+					sum += data[i];
+				}
+				else if (data[i] < 0) {
+					if (data[i] < -BIG_GAP && inx != -1) {
+						break;
+					}
+					$(div).append(
+							'<div class="wave-low" style="width:'
+							+ Math.round(-data[i] / scale)
+							+ 'px" title="' + -data[i] + '">&nbsp;</div>');
+					sum += -data[i];
+				}
+				sum += scale;
+			}
+			sum += (postWave + postSpace) * scale;
+			$(div).append(
+					'<div class="wave-end" style="width:'
+					+ postWave + 'px">&nbsp;</div>');
+			$(div).width(Math.round(sum / scale) + 'px');
+			//$('#wave-info').width(Math.round(sum / scale) + 'px');
+			return i + 1;
+		}
+
+		var SMALL_DIFF = 80; // us
+		var BIG_DIFF = 10000; // us
+		var BIG_GAP = 10000; // us
+		var NEW_PRESS = 400000; // us
+		var MIN_SAMPLES = 10;
+		var MARK_VALS = 2;
+		var SPACE_VALS = 4;
+
+		// raw data for testing
+var rawData = [406,-224,225,-218,230,-542,203,-240,230,-378,202,-571,194,-578,197,-245,224,-219,230,-213,226,-547,197,-415,198,-569,195,-248,231,-541,204,-733,195,-247,202,-88971,446,-215,223,-220,229,-544,201,-242,196,-429,183,-571,204,-569,196,-246,203,-240,198,-245,208,-565,196,-411,201,-581,202,-231,200,-573,202,-734,204,-239,199,-85266,428,-222,227,-216,223,-550,225,-217,231,-377,225,-547,228,-544,231,-212,227,-216,222,-550,225,-557,196,-409,215,-550,225,-218,231,-541,203,-734,194,-248,237,-747095,418,-223,226,-217,231,-542,223,-220,229,-378,224,-549,226,-546,229,-213,226,-217,231,-212,227,-546,229,-378,224,-548,227,-216,222,-550,225,-712,227,-216,222,-88966,422,-223,226,-217,231,-541,224,-219,230,-378,224,-548,227,-545,230,-213,226,-217,231,-212,227,-546,229,-377,225,-548,227,-216,222,-550,225,-712,226,-216,223,-88961,436,-215,224,-218,231,-542,223,-220,228,-380,222,-550,225,-547,228,-215,224,-218,230,-214,225,-547,228,-379,223,-550,225,-218,231,-541,223,-713,226,-218,230,-88949,439,-215,223,-219,230,-543,222,-221,228,-379,223,-549,226,-547,228,-214,224,-219,230,-213,226,-547,228,-379,222,-551,225,-217,231,-542,223,-713,225,-218,231,-88951,441,-212,223,-219,230,-543,222,-221,227,-380,222,-551,224,-548,227,-216,223,-219,229,-215,224,-548,227,-380,222,-551,224,-218,231,-542,222,-714,225,-219,229,-88954,439,-239,227,-189,229,-543,232,-211,227,-381,231,-541,224,-548,227,-216,223,-220,228,-215,224,-549,226,-380,232,-541,224,-219,230,-542,222,-715,224,-218,230,-88954,451,-198,223,-220,229,-543,222,-221,228,-380,232,-541,223,-549,227,-215,223,-220,229,-214,224,-549,227,-380,231,-541,224,-219,230,-542,223,-714,224,-219,230,-88953,433,-221,217,-221,228,-545,230,-213,226,-381,231,-542,223,-549,226,-216,222,-221,228,-215,223,-550,226,-381,230,-542,223,-220,229,-543,222,-715,223,-220,229,-85874,380,-268,232,-212,226,-546,229,-214,225,-383,229,-543,256,-532,209,-218,230,-213,226,-546,229,-544,231,-375,227,-546,229,-213,225,-548,227,-709,229,-214,225,0];
+
+		// unpack into array of stream
+		// stream is of type
+		//  - signal (buffer[], irs)
+		//  - end (buffer[], irse)
+		//  - pause (duration)
+		//  - longPause (duration)
+		function decode(buffer) {
+			console.log(JSON.stringify(buffer));
+			var hasLongPause = false;
+			var stream = new Array();
+			var streamInx = 0;
+			stream[streamInx] = new Object();
+			stream[streamInx].buffer = new Array();
+			for (var i = 0; i < buffer.length; i++) {
+				if (-buffer[i] > BIG_GAP) {
+					if (stream[streamInx].buffer.length < 5) {
+						stream[streamInx].type = 'end';
+						stream[streamInx].irs
+								= decodeEndSignal(stream[streamInx].buffer);
+					}
+					else {
+						stream[streamInx].type = 'signal';
+						stream[streamInx].irs 
+								= decodeSignal(stream[streamInx].buffer);
+					}
+					stream[streamInx].buffer.push(buffer[i]);
+					stream[streamInx].irs.gap = -buffer[i];
+					streamInx++;
+					stream[streamInx] = new Object();
+					stream[streamInx].duration = -buffer[i];
+					if (-buffer[i] > NEW_PRESS) {
+						stream[streamInx].type = 'longPause';
+						hasLongPause = true;
+					}
+					else {
+						stream[streamInx].type = 'pause';
+					}
+					streamInx++;
+					stream[streamInx] = new Object();
+					stream[streamInx].buffer = new Array();
+				}
+				else if (buffer[i] != 0){
+					stream[streamInx].buffer.push(buffer[i]);
+				}
+			}
+			if (stream[streamInx].buffer.length < 5) {
+				stream[streamInx].type = 'end';
+				stream[streamInx].irs
+						= decodeEndSignal(stream[streamInx].buffer);
+			}
+			else {
+				stream[streamInx].type = 'signal';
+				stream[streamInx].irs 
+						= decodeSignal(stream[streamInx].buffer);
+			}
+			console.log(JSON.stringify(stream));
+			var masterIrs = Object.assign({}, stream[0].irs);
+			masterIrs.repCount = 1;
+			masterIrs.repeat = 'R';
+			if (hasLongPause) {
+				var i = 1;
+				for (; i < stream.length; i++) {
+					if (stream[i].type == 'longPause') {
+						break;
+					}
+					if (i % 2 == 0) {
+						// skip pauses
+						masterIrs.repCount++;
+						if (stream[i].type == 'signal') {
+							masterIrs.repMask = masterIrs.data ^ stream[i].irs.data;
+							if (masterIrs.repMask != 0) {
+								masterIrs.repeat = 'M';
+							}
+						}
+						else if (stream[i].type == 'end') {
+							masterIrs.repeat = 'E';
+							masterIrs.pauseS = stream[i].irs.pauseS;
+							masterIrs.stopM = stream[i].irs.stopM;
+							masterIrs.stopS = stream[i].irs.stopS;
+							masterIrs.endM = stream[i].irs.endM;
+						}
+					}
+				}
+				// skip the long pause
+				i++;
+				// skip the first signal in the second pulse set
+				masterIrs.pauseS = stream[i + 1].duration;
+				for (i += 2; i < stream.length; i++) {
+					if (i % 2 == 0) {
+						// skip pauses
+						if (stream[i].type == 'signal') {
+							masterIrs.repMask = masterIrs.data ^ stream[i].irs.data;
+							console.log(masterIrs.repMask.toString(16) 
+									+ '=' + masterIrs.data.toString(16) 
+									+ '^' + stream[i].irs.data.toString(16));
+							if (masterIrs.repMask != 0) {
+								masterIrs.repeat = 'M';
+							}
+						}
+						else if (stream[i].type == 'end') {
+							masterIrs.repeat = 'E';
+							//masterIrs.pauseS = stream[i].irs.pauseS;
+							masterIrs.stopM = stream[i].irs.stopM;
+							masterIrs.stopS = stream[i].irs.stopS;
+							masterIrs.endM = stream[i].irs.endM;
+						}
+					}
+					else if (stream[i].type == 'pause'){
+						masterIrs.gap = stream[i].duration;
+					}
+				}
+			}
+			else {
+				var i = 1;
+				for (; i < stream.length; i++) {
+					if (i % 2 == 0) {
+						// skip pauses
+						masterIrs.repCount++;
+						if (stream[i].type == 'signal') {
+							masterIrs.repMask = masterIrs.data ^ stream[i].irs.data;
+							if (masterIrs.repMask != 0) {
+								masterIrs.repeat = 'M';
+							}
+						}
+						else if (stream[i].type == 'end') {
+							masterIrs.repeat = 'E';
+							masterIrs.pauseS = stream[i].irs.pauseS;
+							masterIrs.stopM = stream[i].irs.stopM;
+							masterIrs.stopS = stream[i].irs.stopS;
+							masterIrs.endM = stream[i].irs.endM;
+						}
+					}
+				}
+			}
+			return masterIrs;
+		}
+
+		function decodeSignal(buffer) {
+			var ret = getCode(buffer, 0);
+			var irs = ret.irs;
+			// Parse for data
+			var offset = 0;
+			if (irs.coding == 'M') {
+				var mask = 1;
+				irs.data = 0;
+				for (var i = 2; i < irs.dataBits * 2 + 2; i += 2) {
+					if (buffer[i] > irs.timings[1] - SMALL_DIFF 
+							&& buffer[i] < irs.timings[1] + SMALL_DIFF) {
+						irs.data += mask;
+					}
+					mask *= 2;
+				}
+			}
+			else if (irs.coding == 'S') {
+				var mask = 1;
+				irs.data = 0;
+				for (var i = 3; i < irs.dataBits * 2 + 3; i += 2) {
+					if (-buffer[i] > irs.timings[2] - SMALL_DIFF 
+							&& -buffer[i] < irs.timings[2] + SMALL_DIFF) {
+						irs.data += mask;
+					}
+					mask *= 2;
+				}
+			}
+			else if (irs.coding == 'Q') {
+				var mask = 1;
+				irs.data = 0;
+				for (var i = 3; i < irs.dataBits + 3; i += 2) {
+					if (-buffer[i] > irs.timings[1] - SMALL_DIFF 
+							&& -buffer[i] < irs.timings[1] + SMALL_DIFF) {
+					}
+					else if (-buffer[i] > irs.timings[2] - SMALL_DIFF 
+							&& -buffer[i] < irs.timings[2] + SMALL_DIFF) {
+						irs.data += mask;
+					}
+					else if (-buffer[i] > irs.timings[3] - SMALL_DIFF 
+							&& -buffer[i] < irs.timings[3] + SMALL_DIFF) {
+						irs.data += mask * 2;
+					}
+					else if (-buffer[i] > irs.timings[4] - SMALL_DIFF 
+							&& -buffer[i] < irs.timings[4] + SMALL_DIFF) {
+						irs.data += mask * 3;
+					}
+					mask *= 4;
+				}
+			}
+			return irs;
+		}
+		
+		function getCode(buffer, inx) {
+			var irs = new Object();
+			irs.timings = new Array();
+
+			var bufInx = buffer.length;
+
+			// Start analysis
+			var mark = new Array(MARK_VALS);
+			var space = new Array(SPACE_VALS);
+
+			var markCount = new Array(2);
+			var spaceCount = new Array(4);
+
+			markCount[0] = 0;
+			markCount[1] = 0;
+			spaceCount[0] = 0;
+			spaceCount[1] = 0;
+			spaceCount[2] = 0;
+			spaceCount[3] = 0;
+
+			var i = inx;
+
+			var j = 0;
+			// fast forward to gap to check no. of samples
+			// 
+			if (bufInx > MIN_SAMPLES) {
+				irs.headM = buffer[i++];
+				irs.headS = -buffer[i++];
+				for (; i < bufInx; i++) {
+					if (-buffer[i] > BIG_GAP) {
+						irs.gap = -buffer[i++];
+						break;
+					}
+					if (buffer[i] < 0) {
+						for (j = 0; j < SPACE_VALS; j++) {
+							if (spaceCount[j] == 0) {
+								space[j] = -buffer[i];
+								spaceCount[j]++;
+								break;
+							}
+							else {
+								var spaceVal = space[j] / spaceCount[j];
+								if (-buffer[i] > spaceVal - SMALL_DIFF
+										&& -buffer[i] < spaceVal + SMALL_DIFF) {
+									space[j] += -buffer[i];
+									spaceCount[j]++;
+									break;
+								}
+							}
+						}
+						if (j == SPACE_VALS) {
+							break;
+						}
+					}
+					else if (buffer[i] > 0) {
+						for (j = 0; j < MARK_VALS; j++) {
+							if (markCount[j] == 0) {
+								mark[j] = buffer[i];
+								markCount[j]++;
+								break;
+							}
+							else {
+								var markVal = mark[j] / markCount[j];
+								if (buffer[i] > markVal - SMALL_DIFF
+										&& buffer[i] < markVal + SMALL_DIFF) {
+									mark[j] += buffer[i];
+									markCount[j]++;
+									break;
+								}
+							}
+						}
+						if (j == MARK_VALS) {
+							break;
+						}
+					}
+				}
+				/*
+				if (i < bufInx - 2) {
+					irs.stopM = buffer[i++];
+					irs.stopS = -buffer[i++];
+				}
+				else {
+					irs.stopM = 0;
+					irs.stopS = 0;
+				}
+				if (i < bufInx) {
+					irs.endM = buffer[i];
+				}
+				else {
+					irs.endM = 0;
+				}
+				*/
+			}
+
+			var markVals = 0;
+			for (var k = 0; k < markCount.length; k++) {
+				if (markCount[k] == 0) {
+					break;
+				}
+				console.log("Mark " + k + "=" + (mark[k] / markCount[k])
+						+ " (" + markCount[k] + " samples)");
+				markVals++;
+			}
+			var spaceVals = 0;
+			for (var k = 0; k < spaceCount.length; k++) {
+				if (spaceCount[k] == 0) {
+					break;
+				}
+				console.log("Space " + k + "=" + (space[k] / spaceCount[k])
+						+ " (" + spaceCount[k] + " samples)");
+				spaceVals++;
+			}
+
+			console.log(markVals + " mark values and " + spaceVals + " space values");
+			if (markVals == 2 && spaceVals == 1) {
+				irs.coding = 'M';
+				if (mark[0] / markCount[0] < mark[1] / markCount[1]) {
+					irs.timings[0] = Math.round(mark[0] / markCount[0]);
+					irs.timings[1] = Math.round(mark[1] / markCount[1]);
+				}
+				else {
+					irs.timings[0] = Math.round(mark[1] / markCount[1]);
+					irs.timings[1] = Math.round(mark[0] / markCount[0]);
+				}
+				irs.timings[2] = Math.round(space[0] / spaceCount[0]);
+				if (irs.pauseS != 0) {
+					//irs.pauseS -= irs.timings[2];
+				}
+				else if (irs.gap != 0){
+					irs.gap -= irs.timings[2];
+				}
+				irs.dataBits = spaceCount[0] + 1;
+			}
+			else if (markVals == 1 && spaceVals == 2) {
+				irs.coding = 'S';
+				if (space[0] / spaceCount[0] < space[1] / spaceCount[1]) {
+					irs.timings[1] = Math.round(space[0] / spaceCount[0]);
+					irs.timings[2] = Math.round(space[1] / spaceCount[1]);
+				}
+				else {
+					irs.timings[1] = Math.round(space[1] / spaceCount[1]);
+					irs.timings[2] = Math.round(space[0] / spaceCount[0]);
+				}
+				irs.timings[0] = Math.round(mark[0] / markCount[0]);
+				irs.dataBits = markCount[0] - 1;
+				irs.endM = irs.timings[0];
+			}
+			else if (markVals == 1 && spaceVals == 4) {
+				irs.coding = 'Q';
+				irs.timings[1] = Math.round(space[0] / spaceCount[0]);
+				irs.timings[2] = Math.round(space[1] / spaceCount[1]);
+				irs.timings[3] = Math.round(space[2] / spaceCount[2]);
+				irs.timings[4] = Math.round(space[3] / spaceCount[3]);
+
+				var k;
+				for (k = 1; k <= 3; k++) {
+					if (irs.timings[k] > irs.timings[k + 1]) {
+						var tmp = irs.timings[k];
+						irs.timings[k] = irs.timings[k + 1];
+						irs.timings[k + 1] = tmp;
+						k = 1;
+						continue;
+					}
+				}
+				irs.timings[0] = Math.round(mark[0] / markCount[0]);
+				irs.endM = irs.timings[0];
+				irs.dataBits = (markCount[0] - 1) * 2;
+			}
+			var ret = new Array();
+			ret.irs = irs;
+			ret.inx = i;
+			return ret;
+		}
+
+		function decodeEndSignal(buffer) {
+			var irs = new Object();
+			irs.stopM = buffer[0];
+			irs.stopS = -buffer[1];
+			irs.endM = buffer[2];
+			return irs;
+		}
+
+		// Debug
+		$( document ).ready(function() {
+			//procIRData(rawData);
+		});
+		</script>
+	</head>
+	<body>
+		<h1>Remote Learn and Send</h1>
+		<div class="wave-container wave-main">
+			<div class="wave-div" id="wave-div-0" style="width:1800px">
+			</div>
+		</div>
+		<div class="wave-container wave-detail" id="wave-detail">
+		</div>
+		<h2>Signal parameters:</h2>
+		<p>Coding: <select id="scheme">
+			<option value="M">Pulse Encoding</option>
+			<option value="S">Space Encoding</option>
+			<option value="P">Phase Encoding</option>
+			<option value="Q">Quad Encoding</option>
+		</select>
+		<span class="gap">&nbsp;</span>Data:
+			<input id="data" type="text" size="12"/>
+		
+		<span class="gap">&nbsp;</span>Data Bits:
+			<input id="bits" type="text" size="4"/>
+		</p>
+		<p>Header:
+			M<input id="headM" type="text" size="4"/>
+			S<input id="headS" type="text" size="4"/>
+		
+		<span class="gap">Timing</span>:
+			<input id="data1" type="text" size="4"/>
+			<input id="data2" type="text" size="4"/>
+			<input id="data3" type="text" size="4"/>
+			<input id="data4" type="text" size="4"/>
+			<input id="data5" type="text" size="4"/>
+		</p>
+		<p>Footer:
+			PauseS<input id="pauseS" type="text" size="4"/>
+			StopM<input id="stopM" type="text" size="4"/>
+			StopS<input id="stopS" type="text" size="4"/>
+			EndM<input id="endM" type="text" size="4"/>
+			Gap<input id="gap" type="text" size="4"/>
+		</p>
+		<p>Repeat: <select id="repeat">
+			<option value="R">Repeat Signal</option>
+			<option value="E">Repeat End</option>
+			<option value="M">Toggle Mask</option>
+		</select><span class="gap"></span>Repeat Count:
+			<input id="repCount" type="text" size="4"/>
+		<span class="gap">Toggle mask</span>:
+			<input id="repMask" type="text" size="12"/>
+		</p>
+		<p><span id="msg"></span></p>
+		<p>Code: <span id="code"></span></p>
+		<p>
+			<button type="button" onclick="send()">Send</button>
+			<button type="button" onclick="learn()">Learn</button>
+		</p>
+	</body>
+</html>
