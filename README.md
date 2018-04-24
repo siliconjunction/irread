@@ -1,11 +1,6 @@
-# A demo Mongoose OS firmware for C/C++
+# Analyse and Send IR Remote Codes
 
 ## Overview
 
-This is an demo app, serves as a skeleton for building Mongoose OS
-apps from scratch in C/C++. It implements the same functionality
-as [demo-js](https://github.com/mongoose-os-apps/demo-js) does, but
-uses C/C++ instead of JavaScript.
+The program is used to analyse IR remote control codes and extract the parameters for the coding scheme. It can also send IR codes for testing. The hardware required is based on the ESP8266. The software is written in C on Mongoose OS.
 
-See [Mongoose OS C/C++ quickstart](https://mongoose-os.com/docs/quickstart/using-c-cpp.html) for
-the C/C++ development introduction.
